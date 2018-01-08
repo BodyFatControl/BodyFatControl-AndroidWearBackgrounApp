@@ -1,4 +1,4 @@
-package com.github.bodyfatcontrol.bodyfatcontrol_androidwearbackgrounapp;
+package bodyfatcontrol.github;
 
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -9,7 +9,6 @@ import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.support.v4.content.LocalBroadcastManager;
-import android.util.Log;
 
 import static android.content.Context.SENSOR_SERVICE;
 
@@ -44,7 +43,7 @@ public class SensorHR implements SensorEventListener {
     }
 
     public void startHR() {
-        mSensorManager.registerListener(this, mHeartRateSensor, SensorManager.SENSOR_DELAY_NORMAL);
+//        mSensorManager.registerListener(this, mHeartRateSensor, SensorManager.SENSOR_DELAY_NORMAL);
     }
 
     public void stopHR () {
