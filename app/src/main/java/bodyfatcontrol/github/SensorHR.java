@@ -51,7 +51,7 @@ public class SensorHR implements SensorEventListener {
     }
 
     public void startHR() {
-        mSensorManager.registerListener(this, mHeartRateSensor, SensorManager.SENSOR_DELAY_NORMAL);
+//        mSensorManager.registerListener(this, mHeartRateSensor, SensorManager.SENSOR_DELAY_NORMAL);
     }
 
     public void stopHR () {

@@ -6,21 +6,29 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.net.Uri;
 import android.os.Bundle;
+import android.support.annotation.NonNull;
 import android.support.v4.content.LocalBroadcastManager;
 import android.support.wearable.activity.WearableActivity;
-import android.util.Log;
 import android.widget.Toast;
 
-import com.google.android.gms.common.ConnectionResult;
-import com.google.android.gms.common.api.GoogleApiClient;
-import com.google.android.gms.wearable.MessageApi;
+import com.google.android.gms.tasks.OnSuccessListener;
+import com.google.android.gms.tasks.Task;
+import com.google.android.gms.wearable.CapabilityClient;
+import com.google.android.gms.wearable.CapabilityInfo;
+import com.google.android.gms.wearable.MessageClient;
+import com.google.android.gms.wearable.MessageEvent;
 import com.google.android.gms.wearable.Node;
-import com.google.android.gms.wearable.NodeApi;
 import com.google.android.gms.wearable.Wearable;
 
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+
 public final class MainActivity extends WearableActivity implements
-        GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener {
+        MessageClient.OnMessageReceivedListener,
+        CapabilityClient.OnCapabilityChangedListener {
 
     private Context mContext = MainActivity.this;
     private AlarmManager alarmMgr;
@@ -28,12 +36,16 @@ public final class MainActivity extends WearableActivity implements
     SensorHR sensorHR;
     private BroadcastReceiver mBroadcastReceiver;
 
-    GoogleApiClient mGoogleApiClient;
+    private static final String MOBILE_APP_CAPABILITY_NAME = "capability_mobile_app";
+    private String mMobileAppNodeId = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         Toast.makeText(this, "Starting background app", Toast.LENGTH_LONG).show();
+
+        // will detect if the app is installed and the wear is connected to Android Wear mobile app
+        setupDetectMobileApp();
 
         // setup an alarm at every 1m, to wakeup the system read HR sensor, etc
         alarmMgr = (AlarmManager)getContext().getSystemService(getContext().ALARM_SERVICE);
@@ -49,18 +61,6 @@ public final class MainActivity extends WearableActivity implements
             @Override
             public void onReceive(Context context, Intent intent) {
                 String hr_value = intent.getStringExtra("HR_VALUE");
-
-                if (mGoogleApiClient.isConnected()) {
-                    NodeApi.GetConnectedNodesResult nodes = Wearable.NodeApi.getConnectedNodes(mGoogleApiClient).await();
-                    for (Node node : nodes.getNodes()) {
-                        MessageApi.SendMessageResult result = Wearable.MessageApi.sendMessage(mGoogleApiClient, node.getId(), "/hr_value", hr_value.getBytes()).await();
-                        if (!result.getStatus().isSuccess()) {
-                            Log.e("sendMessage", "error");
-                        } else {
-                            Log.i("sendMessage", "success!! sent to: " + node.getDisplayName());
-                        }
-                    }
-                }
             }
         };
         LocalBroadcastManager.getInstance(mContext).registerReceiver(mBroadcastReceiver,
@@ -73,23 +73,24 @@ public final class MainActivity extends WearableActivity implements
     }
 
     @Override
-    public void onResume() {
+    protected void onResume() {
         super.onResume();
+        Wearable.getMessageClient(this).addListener(this);
+//        Wearable.getCapabilityClient(this)
+//                .addListener(
+//                        this, Uri.parse("wear://"), CapabilityClient.FILTER_REACHABLE);
 
-        mGoogleApiClient = new GoogleApiClient.Builder(MainActivity.this)
-                .addApi(Wearable.API)
-                .addConnectionCallbacks(this)
-                .addOnConnectionFailedListener(this)
-                .build();
-        mGoogleApiClient.connect();
+        Wearable.getCapabilityClient(this)
+                .addListener(this, MOBILE_APP_CAPABILITY_NAME);
     }
 
     @Override
-    public void onPause() {
+    protected void onPause() {
         super.onPause();
-
-        mGoogleApiClient.disconnect();
+        Wearable.getMessageClient(this).removeListener(this);
+        Wearable.getCapabilityClient(this).removeListener(this);
     }
+
 
     @Override
     protected void onStop()
@@ -99,22 +100,56 @@ public final class MainActivity extends WearableActivity implements
         sensorHR.stopHR(); // stop HR sensor
     }
 
-    @Override
-    public void onConnected(Bundle bundle) {
-        Log.d("MainActivity", "onConnected");
-    }
-
-    @Override
-    public void onConnectionSuspended(int i) {
-    }
-
-    @Override
-    public void onConnectionFailed(ConnectionResult connectionResult) {
-        Log.e("MainActivity", "Failed to connect to Google API Client");
-    }
-
     public Context getContext() {
         return mContext;
+    }
+
+    public void setupDetectMobileApp() {
+        Task<Map<String, CapabilityInfo>> capabilitiesTask =
+                Wearable.getCapabilityClient(this)
+                        .getAllCapabilities(CapabilityClient.FILTER_REACHABLE);
+
+        capabilitiesTask.addOnSuccessListener(new OnSuccessListener<Map<String, CapabilityInfo>>() {
+            @Override
+            public void onSuccess(Map<String, CapabilityInfo> capabilityInfoMap) {
+                if (capabilityInfoMap.isEmpty()) {
+                    return;
+                }
+
+                CapabilityInfo capabilityInfo = capabilityInfoMap.get(MOBILE_APP_CAPABILITY_NAME);
+                if (capabilityInfo != null) {
+                    Set<Node> connectedNodes = capabilityInfo.getNodes();
+
+                    // Find a nearby node
+                    mMobileAppNodeId = null;
+                    for (Node node : connectedNodes) {
+                        if (node.isNearby()) {
+                            mMobileAppNodeId = node.getId();
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    @Override
+    public void onCapabilityChanged(@NonNull CapabilityInfo capabilityInfo) {
+        if (capabilityInfo != null) {
+            Set<Node> connectedNodes = capabilityInfo.getNodes();
+
+            // Find a nearby node
+            mMobileAppNodeId = null;
+            for (Node node : connectedNodes) {
+                if (node.isNearby()) {
+                    mMobileAppNodeId = node.getId();
+                }
+            }
+        }
+    }
+
+    @Override
+    public void onMessageReceived(@NonNull MessageEvent messageEvent) {
+
     }
 }
 
