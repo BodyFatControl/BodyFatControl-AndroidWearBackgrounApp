@@ -22,6 +22,7 @@ import com.google.android.gms.wearable.MessageEvent;
 import com.google.android.gms.wearable.Node;
 import com.google.android.gms.wearable.Wearable;
 
+import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -37,6 +38,7 @@ public final class MainActivity extends WearableActivity implements
     private BroadcastReceiver mBroadcastReceiver;
 
     private static final String MOBILE_APP_CAPABILITY_NAME = "capability_mobile_app";
+    public static final String MESSAGE_PATH = "/message_path";
     private String mMobileAppNodeId = null;
 
     @Override
@@ -61,6 +63,11 @@ public final class MainActivity extends WearableActivity implements
             @Override
             public void onReceive(Context context, Intent intent) {
                 String hr_value = intent.getStringExtra("HR_VALUE");
+
+                if (mMobileAppNodeId != null) {
+                    Task<Integer> sendTask = Wearable.getMessageClient(MainActivity.this).sendMessage(
+                            mMobileAppNodeId, MESSAGE_PATH, hr_value.getBytes());
+                }
             }
         };
         LocalBroadcastManager.getInstance(mContext).registerReceiver(mBroadcastReceiver,
