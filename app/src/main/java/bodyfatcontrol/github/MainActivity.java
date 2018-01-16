@@ -29,7 +29,7 @@ public final class MainActivity extends WearableActivity implements
         MessageClient.OnMessageReceivedListener,
         CapabilityClient.OnCapabilityChangedListener {
 
-    private Context mContext = MainActivity.this;
+    public static Context context;
     SensorHR sensorHR;
     private BroadcastReceiver mBroadcastReceiver;
 
@@ -42,25 +42,28 @@ public final class MainActivity extends WearableActivity implements
         super.onCreate(savedInstanceState);
         Toast.makeText(this, "Starting background app", Toast.LENGTH_LONG).show();
 
+        context = getApplicationContext();
+
         // will setup and detect if the app is installed and the wear is connected to Android Wear mobile app
         setupDetectMobileApp();
 
         // start HR sensor
-        sensorHR = new SensorHR(mContext);
+        sensorHR = new SensorHR(context);
 
         // receive the value of HR sensor
         mBroadcastReceiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
                 String HRValue = intent.getStringExtra("HR_VALUE");
-                Log.i("onReceive", HRValue);
+
+                // send the HR value to the mobile app
                 if (mMobileAppNodeId != null) {
                     Task<Integer> sendTask = Wearable.getMessageClient(MainActivity.this).sendMessage(
                             mMobileAppNodeId, MESSAGE_PATH, HRValue.getBytes());
                 }
             }
         };
-        LocalBroadcastManager.getInstance(mContext).registerReceiver(mBroadcastReceiver,
+        LocalBroadcastManager.getInstance(context).registerReceiver(mBroadcastReceiver,
                 new IntentFilter("HR_VALUE"));
 
         // Enables Always-on
@@ -94,7 +97,7 @@ public final class MainActivity extends WearableActivity implements
     }
 
     public Context getContext() {
-        return mContext;
+        return context;
     }
 
     public void setupDetectMobileApp() {
