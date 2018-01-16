@@ -6,11 +6,11 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.net.Uri;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.v4.content.LocalBroadcastManager;
 import android.support.wearable.activity.WearableActivity;
+import android.util.Log;
 import android.widget.Toast;
 
 import com.google.android.gms.tasks.OnSuccessListener;
@@ -22,8 +22,6 @@ import com.google.android.gms.wearable.MessageEvent;
 import com.google.android.gms.wearable.Node;
 import com.google.android.gms.wearable.Wearable;
 
-import java.nio.charset.StandardCharsets;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
@@ -32,8 +30,6 @@ public final class MainActivity extends WearableActivity implements
         CapabilityClient.OnCapabilityChangedListener {
 
     private Context mContext = MainActivity.this;
-    private AlarmManager alarmMgr;
-    private PendingIntent alarmIntent;
     SensorHR sensorHR;
     private BroadcastReceiver mBroadcastReceiver;
 
@@ -46,27 +42,21 @@ public final class MainActivity extends WearableActivity implements
         super.onCreate(savedInstanceState);
         Toast.makeText(this, "Starting background app", Toast.LENGTH_LONG).show();
 
-        // will detect if the app is installed and the wear is connected to Android Wear mobile app
+        // will setup and detect if the app is installed and the wear is connected to Android Wear mobile app
         setupDetectMobileApp();
 
-        // setup an alarm at every 1m, to wakeup the system read HR sensor, etc
-        alarmMgr = (AlarmManager)getContext().getSystemService(getContext().ALARM_SERVICE);
-        Intent intent = new Intent(getContext(), MyReceiver.class);
-        intent.setAction("bodyfatcontrol.github");
-        alarmIntent = PendingIntent.getBroadcast(getContext(), 0, intent, 0);
-        alarmMgr.setRepeating(AlarmManager.RTC_WAKEUP, System.currentTimeMillis(),
-                1000 * 60, alarmIntent);
-
+        // start HR sensor
         sensorHR = new SensorHR(mContext);
 
+        // receive the value of HR sensor
         mBroadcastReceiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
-                String hr_value = intent.getStringExtra("HR_VALUE");
-
+                String HRValue = intent.getStringExtra("HR_VALUE");
+                Log.i("onReceive", HRValue);
                 if (mMobileAppNodeId != null) {
                     Task<Integer> sendTask = Wearable.getMessageClient(MainActivity.this).sendMessage(
-                            mMobileAppNodeId, MESSAGE_PATH, hr_value.getBytes());
+                            mMobileAppNodeId, MESSAGE_PATH, HRValue.getBytes());
                 }
             }
         };
@@ -76,17 +66,13 @@ public final class MainActivity extends WearableActivity implements
         // Enables Always-on
         setAmbientEnabled();
 
-//        finish();
+        finish();
     }
 
     @Override
     protected void onResume() {
         super.onResume();
         Wearable.getMessageClient(this).addListener(this);
-//        Wearable.getCapabilityClient(this)
-//                .addListener(
-//                        this, Uri.parse("wear://"), CapabilityClient.FILTER_REACHABLE);
-
         Wearable.getCapabilityClient(this)
                 .addListener(this, MOBILE_APP_CAPABILITY_NAME);
     }
@@ -104,7 +90,7 @@ public final class MainActivity extends WearableActivity implements
     {
         super.onStop();
 //        alarmMgr.cancel(alarmIntent); // stop alarm
-        sensorHR.stopHR(); // stop HR sensor
+//        sensorHR.stopHRSensor(); // stop HR sensor
     }
 
     public Context getContext() {
