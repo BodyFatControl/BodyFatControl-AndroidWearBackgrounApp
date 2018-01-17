@@ -1,16 +1,14 @@
 package bodyfatcontrol.github;
 
-import android.app.AlarmManager;
-import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.v4.content.LocalBroadcastManager;
 import android.support.wearable.activity.WearableActivity;
-import android.util.Log;
 import android.widget.Toast;
 
 import com.google.android.gms.tasks.OnSuccessListener;
@@ -30,12 +28,19 @@ public final class MainActivity extends WearableActivity implements
         CapabilityClient.OnCapabilityChangedListener {
 
     public static Context context;
+    public static SharedPreferences sharedPref;
+    public static UserProfile userProfile;
+
     SensorHR sensorHR;
     private BroadcastReceiver mBroadcastReceiver;
+
+    public static final long SECONDS_24H = 24*60*60;
 
     private static final String MOBILE_APP_CAPABILITY_NAME = "capability_mobile_app";
     public static final String MESSAGE_PATH = "/message_path";
     private String mMobileAppNodeId = null;
+
+    private Calories mCalories;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -43,6 +48,16 @@ public final class MainActivity extends WearableActivity implements
         Toast.makeText(this, "Starting background app", Toast.LENGTH_LONG).show();
 
         context = getApplicationContext();
+        sharedPref = this.getPreferences(Context.MODE_PRIVATE);
+
+        userProfile = new UserProfile();
+        userProfile.setDate(System.currentTimeMillis());
+        userProfile.setUserBirthYear(1979);
+        userProfile.setUserGender(1);
+        userProfile.setUserHeight(173);
+        userProfile.setUserWeight(100);
+
+        mCalories = new Calories();
 
         // will setup and detect if the app is installed and the wear is connected to Android Wear mobile app
         setupDetectMobileApp();
@@ -54,13 +69,18 @@ public final class MainActivity extends WearableActivity implements
         mBroadcastReceiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
-                String HRValue = intent.getStringExtra("HR_VALUE");
+                int HRValue = intent.getIntExtra("HR_VALUE", 0);
 
-                // send the HR value to the mobile app
-                if (mMobileAppNodeId != null) {
-                    Task<Integer> sendTask = Wearable.getMessageClient(MainActivity.this).sendMessage(
-                            mMobileAppNodeId, MESSAGE_PATH, HRValue.getBytes());
-                }
+                // save
+                long date = System.currentTimeMillis();
+                date = date - (date % 60000); // get date in minutes
+                mCalories.StoreCalories(date, HRValue);
+
+//                // send the HR value to the mobile app
+//                if (mMobileAppNodeId != null) {
+//                    Task<Integer> sendTask = Wearable.getMessageClient(MainActivity.this).sendMessage(
+//                            mMobileAppNodeId, MESSAGE_PATH, HRValue.getBytes());
+//                }
             }
         };
         LocalBroadcastManager.getInstance(context).registerReceiver(mBroadcastReceiver,
@@ -92,8 +112,7 @@ public final class MainActivity extends WearableActivity implements
     protected void onStop()
     {
         super.onStop();
-//        alarmMgr.cancel(alarmIntent); // stop alarm
-//        sensorHR.stopHRSensor(); // stop HR sensor
+        sensorHR.stopHRSensor(); // stop HR sensor
     }
 
     public Context getContext() {
