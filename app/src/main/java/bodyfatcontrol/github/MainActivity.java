@@ -28,6 +28,8 @@ import java.util.ArrayList;
 import java.util.Map;
 import java.util.Set;
 
+import static bodyfatcontrol.github.Utils.*;
+
 public final class MainActivity extends WearableActivity implements
         MessageClient.OnMessageReceivedListener,
         CapabilityClient.OnCapabilityChangedListener {
@@ -104,29 +106,9 @@ public final class MainActivity extends WearableActivity implements
             public void onReceive(Context context, Intent intent) {
                 byte[] message = intent.getByteArrayExtra("MESSAGE");
 
-                long command = Longs.fromBytes(
-                        message[0],
-                        message[1],
-                        message[2],
-                        message[3],
-                        message[4],
-                        message[5],
-                        message[6],
-                        message[7]);
-
+                long command = ByteArrayToLong(ArrayUtils.subarray(message, 0, 8));
                 if (command == MainActivity.HISTORIC_CALS_COMMAND) {
-                    long date = Longs.fromBytes(
-                            message[8],
-                            message[9],
-                            message[10],
-                            message[11],
-                            message[12],
-                            message[13],
-                            message[14],
-                            message[15]);
-
-
-
+                    long date = ByteArrayToLong(ArrayUtils.subarray(message, 8, 16));
                     long finalDate = MainActivity.currentMinute - 1; // get date in minutes
 
                     // A byte[] of data, which Google recommends be no larger than 100KB in size
@@ -149,14 +131,10 @@ public final class MainActivity extends WearableActivity implements
                         double caloriesPerMinute = measurement.getCaloriesPerMinute();
                         double caloriesEERPerMinute = measurement.getCaloriesEERPerMinute();
 
-                        messageBytes = ArrayUtils.addAll(messageBytes,
-                                ByteBuffer.allocate(Long.SIZE / Byte.SIZE).putLong(date).array());
-                        messageBytes = ArrayUtils.addAll(messageBytes,
-                                ByteBuffer.allocate(Integer.SIZE / Byte.SIZE).putInt(HR).array());
-                        messageBytes = ArrayUtils.addAll(messageBytes,
-                                ByteBuffer.allocate(Double.SIZE / Byte.SIZE).putDouble(caloriesPerMinute).array());
-                        messageBytes = ArrayUtils.addAll(messageBytes,
-                                ByteBuffer.allocate(Double.SIZE / Byte.SIZE).putDouble(caloriesEERPerMinute).array());
+                        messageBytes = ArrayUtils.addAll(messageBytes, LongToByteArray(date));
+                        messageBytes = ArrayUtils.addAll(messageBytes, IntToByteArray(HR));
+                        messageBytes = ArrayUtils.addAll(messageBytes, DoubleToByteArray(caloriesPerMinute));
+                        messageBytes = ArrayUtils.addAll(messageBytes, DoubleToByteArray(caloriesEERPerMinute));
                     }
 
                     // send the message to the mobile app

@@ -18,7 +18,6 @@ public class ListenerService extends WearableListenerService {
 
         // broadcast the HR value to MainActivity
         LocalBroadcastManager.getInstance(MainActivity.context).sendBroadcast(
-                new Intent("RECEIVED_COMMAND").putExtra(
-                        "MESSAGE", message));
+                new Intent("RECEIVED_COMMAND").putExtra("MESSAGE", message));
     }
 }
