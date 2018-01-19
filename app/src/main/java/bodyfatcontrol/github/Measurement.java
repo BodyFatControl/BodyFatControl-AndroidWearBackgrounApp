@@ -2,9 +2,16 @@ package bodyfatcontrol.github;
 
 public class Measurement {
     private long date; // UTC Unix BUT in minutes
-    private int HR;
+    private int HR = -1;
     private double caloriesPerMinute;
     private double caloriesEERPerMinute;
+
+    Measurement () {
+        date = 0;
+        HR = -1;
+        caloriesPerMinute = 0;
+        caloriesEERPerMinute = 0;
+    }
 
     public long getDate() {
         return date;

@@ -32,4 +32,6 @@ dependencies {
     compile 'com.google.android.gms:play-services-wearable:11.8.0'
     provided 'com.google.android.wearable:wearable:2.1.0'
     compile 'com.google.android.support:wearable:2.1.0'
+    compile group: 'org.apache.commons', name: 'commons-lang3', version: '3.4'
+    compile 'com.google.guava:guava:23.6-android'
 }

@@ -6,7 +6,7 @@ public class Calories {
     UserProfile mUserProfile;
     DataBaseCalories mDataBaseCalories;
     Measurement mMeasurement;
-    double caloriesEERPerMinute;
+    static public double caloriesEERPerMinute;
 
     Calories() {
         mUserProfile = MainActivity.userProfile;
@@ -97,7 +97,6 @@ public class Calories {
         int birthYear = mUserProfile.getUserBirthYear();
         int age = (Calendar.getInstance().get(Calendar.YEAR)) - birthYear;
         int gender = mUserProfile.getUserGender();
-        double height = (double) mUserProfile.getUserHeight();
         double weight = (double) mUserProfile.getUserWeight();
 
         double HR = (double) HRValue;

@@ -19,7 +19,12 @@ import com.google.android.gms.wearable.MessageClient;
 import com.google.android.gms.wearable.MessageEvent;
 import com.google.android.gms.wearable.Node;
 import com.google.android.gms.wearable.Wearable;
+import com.google.common.primitives.Longs;
 
+import org.apache.commons.lang3.ArrayUtils;
+
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.Set;
 
@@ -30,9 +35,13 @@ public final class MainActivity extends WearableActivity implements
     public static Context context;
     public static SharedPreferences sharedPref;
     public static UserProfile userProfile;
+    public static final int HISTORIC_CALS_COMMAND = 104030201;
+    private static final int USER_DATA_COMMAND = 204030201;
+    private static final int CALORIES_CONSUMED_COMMAND = 304030201;
 
     SensorHR sensorHR;
-    private BroadcastReceiver mBroadcastReceiver;
+    private BroadcastReceiver mBroadcastReceiverHR;
+    private BroadcastReceiver mBroadcastReceiverReceivedCommands;
 
     public static final long SECONDS_24H = 24*60*60;
 
@@ -41,14 +50,20 @@ public final class MainActivity extends WearableActivity implements
     private String mMobileAppNodeId = null;
 
     private Calories mCalories;
+    private DataBaseCalories mDataBaseCalories;
+
+    public static long currentMinute;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        Toast.makeText(this, "Starting background app", Toast.LENGTH_LONG).show();
+//        Toast.makeText(this, "Starting background app", Toast.LENGTH_LONG).show();
 
         context = getApplicationContext();
         sharedPref = this.getPreferences(Context.MODE_PRIVATE);
+
+        long date = System.currentTimeMillis();
+        currentMinute = date - (date % 60000); // get date at start of a minute
 
         userProfile = new UserProfile();
         userProfile.setDate(System.currentTimeMillis());
@@ -58,6 +73,7 @@ public final class MainActivity extends WearableActivity implements
         userProfile.setUserWeight(100);
 
         mCalories = new Calories();
+        mDataBaseCalories = new DataBaseCalories();
 
         // will setup and detect if the app is installed and the wear is connected to Android Wear mobile app
         setupDetectMobileApp();
@@ -66,25 +82,96 @@ public final class MainActivity extends WearableActivity implements
         sensorHR = new SensorHR(context);
 
         // receive the value of HR sensor
-        mBroadcastReceiver = new BroadcastReceiver() {
+        mBroadcastReceiverHR = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
                 int HRValue = intent.getIntExtra("HR_VALUE", 0);
 
-                // save
-                long date = System.currentTimeMillis();
-                date = date - (date % 60000); // get date in minutes
-                mCalories.StoreCalories(date, HRValue);
+                mCalories.StoreCalories(currentMinute, HRValue);
 
-//                // send the HR value to the mobile app
-//                if (mMobileAppNodeId != null) {
-//                    Task<Integer> sendTask = Wearable.getMessageClient(MainActivity.this).sendMessage(
-//                            mMobileAppNodeId, MESSAGE_PATH, HRValue.getBytes());
-//                }
+                // every hour
+                if ((currentMinute % (60*60*1000)) == 0) {
+                    manageDataBasesSizes();
+                }
             }
         };
-        LocalBroadcastManager.getInstance(context).registerReceiver(mBroadcastReceiver,
+        LocalBroadcastManager.getInstance(context).registerReceiver(mBroadcastReceiverHR,
                 new IntentFilter("HR_VALUE"));
+
+        // receive the data from received commands
+        mBroadcastReceiverReceivedCommands = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                byte[] message = intent.getByteArrayExtra("MESSAGE");
+
+                long command = Longs.fromBytes(
+                        message[0],
+                        message[1],
+                        message[2],
+                        message[3],
+                        message[4],
+                        message[5],
+                        message[6],
+                        message[7]);
+
+                if (command == MainActivity.HISTORIC_CALS_COMMAND) {
+                    long date = Longs.fromBytes(
+                            message[8],
+                            message[9],
+                            message[10],
+                            message[11],
+                            message[12],
+                            message[13],
+                            message[14],
+                            message[15]);
+
+
+
+                    long finalDate = MainActivity.currentMinute - 1; // get date in minutes
+
+                    // A byte[] of data, which Google recommends be no larger than 100KB in size
+                    // each measure = 8bytes * 4 = 32 bytes
+                    // 24h = 46080 bytes, limit interval to be no more than 24h
+                    long maxRange = 24*60*60*1000;
+                    if ((finalDate - date) > maxRange) {
+                        finalDate = date + maxRange;
+                    }
+
+                    // send result for HISTORIC_CALS_COMMAND
+                    ArrayList<Measurement> measurementList = mDataBaseCalories.DataBaseGetMeasurements(date, finalDate);
+
+                    byte[] messageBytes = ByteBuffer.allocate(Long.SIZE / Byte.SIZE).putLong(HISTORIC_CALS_COMMAND).array();
+
+                    for (Measurement measurement : measurementList) {
+
+                        date = measurement.getDate();
+                        int HR = measurement.getHR();
+                        double caloriesPerMinute = measurement.getCaloriesPerMinute();
+                        double caloriesEERPerMinute = measurement.getCaloriesEERPerMinute();
+
+                        messageBytes = ArrayUtils.addAll(messageBytes,
+                                ByteBuffer.allocate(Long.SIZE / Byte.SIZE).putLong(date).array());
+                        messageBytes = ArrayUtils.addAll(messageBytes,
+                                ByteBuffer.allocate(Integer.SIZE / Byte.SIZE).putInt(HR).array());
+                        messageBytes = ArrayUtils.addAll(messageBytes,
+                                ByteBuffer.allocate(Double.SIZE / Byte.SIZE).putDouble(caloriesPerMinute).array());
+                        messageBytes = ArrayUtils.addAll(messageBytes,
+                                ByteBuffer.allocate(Double.SIZE / Byte.SIZE).putDouble(caloriesEERPerMinute).array());
+                    }
+
+                    // send the message to the mobile app
+                    if (mMobileAppNodeId != null) {
+                        Task<Integer> sendTask = Wearable.getMessageClient(MainActivity.this).sendMessage(
+                                mMobileAppNodeId, MESSAGE_PATH, messageBytes);
+                    }
+                }
+            }
+        };
+        LocalBroadcastManager.getInstance(context).registerReceiver(mBroadcastReceiverReceivedCommands,
+                new IntentFilter("RECEIVED_COMMAND"));
+
+        manageDataBasesSizes();
+        mDataBaseCalories.DataBaseFillEmptyMeasurements ();
 
         // Enables Always-on
         setAmbientEnabled();
@@ -165,6 +252,11 @@ public final class MainActivity extends WearableActivity implements
     @Override
     public void onMessageReceived(@NonNull MessageEvent messageEvent) {
 
+    }
+
+    private void manageDataBasesSizes () {
+        long date = currentMinute - (48*60*60*1000); // go 48h backwards
+        mDataBaseCalories.DataBaseCleanBeforeDate(date);
     }
 }
 

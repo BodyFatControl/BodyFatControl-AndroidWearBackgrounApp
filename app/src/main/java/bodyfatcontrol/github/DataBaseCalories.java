@@ -70,8 +70,29 @@ public class DataBaseCalories extends SQLiteOpenHelper {
         db.close(); // Closing database connection
     }
 
+    public void DataBaseFillEmptyMeasurements () {
+        long currentMinute = MainActivity.currentMinute;
+        long minute = currentMinute - (48*60*60*1000); // start at 48h backwards
+        int numberOfMinutes = (int) (((currentMinute - minute) / 60000)) - 1; // -1 to not count with actual minute
+
+        for ( ; numberOfMinutes > 0; numberOfMinutes--) {
+            Measurement measurement = DataBaseGetMeasurement(minute);
+            // see if there was no measurement on the minute and if so
+            // set with EER calories value and HR = 0
+            if (measurement == null) {
+                measurement = new Measurement();
+                measurement.setDate(minute);
+                measurement.setHR(0);
+                measurement.setCaloriesPerMinute(Calories.caloriesEERPerMinute);
+                measurement.setCaloriesEERPerMinute(Calories.caloriesEERPerMinute);
+                DataBaseWriteMeasurement(measurement);
+            }
+
+            minute += 60000;
+        }
+    }
+
     public ArrayList<Measurement> DataBaseGetMeasurements (long initialDate, long finalDate) {
-        // Query to get all the records starting at last midnight, ordered by date ascending
         SQLiteDatabase db = this.getWritableDatabase();
         String query = "SELECT * FROM " + TABLE_NAME + " WHERE " + COLUMN_DATE + " BETWEEN " +
                 + initialDate + " AND " + finalDate + " ORDER BY " + COLUMN_DATE +
@@ -82,17 +103,17 @@ public class DataBaseCalories extends SQLiteOpenHelper {
         // Loop to put all the values to the ArrayList<Measurement>
         cursor.moveToFirst();
         int counter = cursor.getCount();
-        int date;
+        long date;
         int HR;
-        int caloriesPerMinute;
-        int caloriesEERPerMinute;
+        double caloriesPerMinute;
+        double caloriesEERPerMinute;
         ArrayList<Measurement> measurementList = new ArrayList<Measurement>();
         for ( ; counter > 0; ) {
             if (cursor.isAfterLast()) break;
-            date = cursor.getInt(cursor.getColumnIndex(COLUMN_DATE));
+            date = cursor.getLong(cursor.getColumnIndex(COLUMN_DATE));
             HR = cursor.getInt(cursor.getColumnIndex(COLUMN_HR));
-            caloriesPerMinute = cursor.getInt(cursor.getColumnIndex(COLUMN_CALORIES_PER_MINUTE_VALUE));
-            caloriesEERPerMinute = cursor.getInt(cursor.getColumnIndex(COLUMN_CALORIES_EER_PER_MINUTE_VALUE));
+            caloriesPerMinute = cursor.getDouble(cursor.getColumnIndex(COLUMN_CALORIES_PER_MINUTE_VALUE));
+            caloriesEERPerMinute = cursor.getDouble(cursor.getColumnIndex(COLUMN_CALORIES_EER_PER_MINUTE_VALUE));
             cursor.moveToNext();
 
             Measurement measurement = new Measurement();
@@ -108,6 +129,53 @@ public class DataBaseCalories extends SQLiteOpenHelper {
         return measurementList;
     }
 
+    public Measurement DataBaseGetMeasurement (long date) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        String query = "SELECT * FROM " + TABLE_NAME + " WHERE " + COLUMN_DATE + " = " +
+                + date;
+
+        Cursor cursor = db.rawQuery(query, null);
+
+        cursor.moveToFirst();
+        int counter = cursor.getCount();
+        int HR;
+        double caloriesPerMinute;
+        double caloriesEERPerMinute;
+        Measurement measurement = null;
+        if (counter > 0) {
+            date = cursor.getLong(cursor.getColumnIndex(COLUMN_DATE));
+            HR = cursor.getInt(cursor.getColumnIndex(COLUMN_HR));
+            caloriesPerMinute = cursor.getDouble(cursor.getColumnIndex(COLUMN_CALORIES_PER_MINUTE_VALUE));
+            caloriesEERPerMinute = cursor.getDouble(cursor.getColumnIndex(COLUMN_CALORIES_EER_PER_MINUTE_VALUE));
+
+            measurement = new Measurement();
+            measurement.setDate(date);
+            measurement.setHR(HR);
+            measurement.setCaloriesPerMinute(caloriesPerMinute);
+            measurement.setCaloriesEERPerMinute(caloriesEERPerMinute);
+        }
+
+        cursor.close();
+        db.close(); // Closing database connection
+        return measurement;
+    }
+
+    public long DataBaseGetFirstMeasurementDate() {
+        SQLiteDatabase db = this.getWritableDatabase();
+        // build the query
+        String query = "SELECT * FROM " + TABLE_NAME + " ORDER BY " + COLUMN_DATE + " ASC LIMIT 1";
+        // open database
+        Cursor cursor = db.rawQuery(query, null);
+        long date = 0;
+        if (cursor.moveToFirst() == true) { // if cursor is not empty
+            date = cursor.getLong(cursor.getColumnIndex(COLUMN_DATE));
+        }
+
+        cursor.close();
+        db.close(); // Closing database connection
+        return date;
+    }
+
     public long DataBaseGetLastMeasurementDate() {
         SQLiteDatabase db = this.getWritableDatabase();
         // build the query
@@ -116,11 +184,36 @@ public class DataBaseCalories extends SQLiteOpenHelper {
         Cursor cursor = db.rawQuery(query, null);
         long date = 0;
         if (cursor.moveToFirst() == true) { // if cursor is not empty
-            date = cursor.getInt(cursor.getColumnIndex(COLUMN_DATE));
+            date = cursor.getLong(cursor.getColumnIndex(COLUMN_DATE));
         }
 
         cursor.close();
         db.close(); // Closing database connection
         return date;
+    }
+
+    public long DataBaseGetFirstMeasurementDate(long initialDate) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        // build the query
+        String query = "SELECT * FROM " + TABLE_NAME + " WHERE " + COLUMN_DATE + " >= " + initialDate;
+
+        // open database
+        Cursor cursor = db.rawQuery(query, null);
+        long date = 0;
+        if (cursor.moveToFirst() == true) { // if cursor is not empty
+            date = cursor.getLong(cursor.getColumnIndex(COLUMN_DATE));
+        }
+
+        cursor.close();
+        db.close(); // Closing database connection
+        return date;
+    }
+
+    public void DataBaseCleanBeforeDate(long date) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        // build the query
+        String query = "DELETE FROM " + TABLE_NAME + " WHERE " + COLUMN_DATE + " < " + date;
+
+        db.execSQL(query);
     }
 }
