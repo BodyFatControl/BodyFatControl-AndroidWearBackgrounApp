@@ -11,7 +11,6 @@ public class MyReceiver extends BroadcastReceiver {
     public void onReceive(Context context, Intent intent) {
 
         if (intent.getAction().equalsIgnoreCase("bodyfatcontrol.github-timer")) {
-
             long date = System.currentTimeMillis();
             MainActivity.currentMinute = date - (date % 60000); // get date at start of a minute
 

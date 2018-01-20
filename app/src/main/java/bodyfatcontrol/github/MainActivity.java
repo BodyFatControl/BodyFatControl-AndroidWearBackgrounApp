@@ -9,6 +9,7 @@ import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.v4.content.LocalBroadcastManager;
 import android.support.wearable.activity.WearableActivity;
+import android.util.Log;
 import android.widget.Toast;
 
 import com.google.android.gms.tasks.OnSuccessListener;
@@ -109,7 +110,7 @@ public final class MainActivity extends WearableActivity implements
                 long command = ByteArrayToLong(ArrayUtils.subarray(message, 0, 8));
                 if (command == MainActivity.HISTORIC_CALS_COMMAND) {
                     long date = ByteArrayToLong(ArrayUtils.subarray(message, 8, 16));
-                    long finalDate = MainActivity.currentMinute - 1; // get date in minutes
+                    long finalDate = MainActivity.currentMinute - 60000; // get date in minutes (previous minute)
 
                     // A byte[] of data, which Google recommends be no larger than 100KB in size
                     // each measure = 8bytes * 4 = 32 bytes
@@ -119,6 +120,11 @@ public final class MainActivity extends WearableActivity implements
                         finalDate = date + maxRange;
                     }
 
+                    if (date > finalDate) {
+                        // date must be previous, otherway just skip
+                        return;
+                    }
+
                     // send result for HISTORIC_CALS_COMMAND
                     ArrayList<Measurement> measurementList = mDataBaseCalories.DataBaseGetMeasurements(date, finalDate);
 
@@ -126,12 +132,12 @@ public final class MainActivity extends WearableActivity implements
 
                     for (Measurement measurement : measurementList) {
 
-                        date = measurement.getDate();
+                        long date_measurement = measurement.getDate();
                         int HR = measurement.getHR();
                         double caloriesPerMinute = measurement.getCaloriesPerMinute();
                         double caloriesEERPerMinute = measurement.getCaloriesEERPerMinute();
 
-                        messageBytes = ArrayUtils.addAll(messageBytes, LongToByteArray(date));
+                        messageBytes = ArrayUtils.addAll(messageBytes, LongToByteArray(date_measurement));
                         messageBytes = ArrayUtils.addAll(messageBytes, IntToByteArray(HR));
                         messageBytes = ArrayUtils.addAll(messageBytes, DoubleToByteArray(caloriesPerMinute));
                         messageBytes = ArrayUtils.addAll(messageBytes, DoubleToByteArray(caloriesEERPerMinute));
