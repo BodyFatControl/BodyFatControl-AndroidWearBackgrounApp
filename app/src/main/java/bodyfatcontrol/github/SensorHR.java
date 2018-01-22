@@ -25,9 +25,10 @@ public class SensorHR implements SensorEventListener {
     private AlarmManager alarmMgr;
     private PendingIntent alarmIntent;
 
-    private Boolean mHRSensorEnable = false;
+    private boolean mHRSensorEnable = false;
 
     private int mLastHRValue = -1;
+    private boolean mFirstHRMeasurement = true;
     private int mHRValue = -1;
 
     public SensorHR (Context context) {
@@ -59,10 +60,13 @@ public class SensorHR implements SensorEventListener {
     public void onSensorChanged(SensorEvent event) {
         if (event.sensor.getType() == Sensor.TYPE_HEART_RATE) {
             mLastHRValue = (int) event.values[0];
-            if (mLastHRValue > 0)
-            {
-                alarmMgr.cancel(alarmIntent); // stop ongoing alarm first
+
+            if ((mFirstHRMeasurement == true) && (mLastHRValue > 0) ||
+                (mFirstHRMeasurement == false)) {
+                mFirstHRMeasurement = true;
                 setupHRMeasurement (); // setup next HR measurement
+            } else if (mFirstHRMeasurement == true) {
+                mFirstHRMeasurement = false;
             }
         }
     }
@@ -73,7 +77,7 @@ public class SensorHR implements SensorEventListener {
 
     public void stopHRSensor () {
         mSensorManager.unregisterListener(this);
-        alarmMgr.cancel(alarmIntent); // stop alarm
+//        alarmMgr.cancel(alarmIntent); // stop alarm
     }
 
     public void setupHRMeasurement () {
