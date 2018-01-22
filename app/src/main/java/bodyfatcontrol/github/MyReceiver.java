@@ -16,6 +16,11 @@ public class MyReceiver extends BroadcastReceiver {
 
             // send the message TIMER_FIRED
             LocalBroadcastManager.getInstance(context).sendBroadcast(new Intent("TIMER_FIRED"));
+
+        } else if (intent.getAction().equals(Intent.ACTION_BOOT_COMPLETED)) {
+            Intent i = new Intent(context, MainActivity.class);
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            context.startActivity(i);
         }
     }
 }

@@ -6,6 +6,7 @@
 
     <uses-permission android:name="android.permission.BODY_SENSORS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <application
         android:allowBackup="true"
@@ -30,19 +31,18 @@
             android:label="@string/app_name">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
 
         <receiver
-            android:name=".MyReceiver"
             android:enabled="true"
-            android:exported="false">
+            android:exported="true"
+            android:name=".MyReceiver">
+
             <intent-filter>
-                <action android:name="bodyfatcontrol.github"/>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
-                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </receiver>
 
